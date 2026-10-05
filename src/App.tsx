@@ -1,15 +1,7 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
+import { useState, useMemo, useCallback } from 'react';
 import { AlertCircle, X, MapPin, Route, Compass, Upload, Printer } from 'lucide-react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
-import { PlacemarkMarker } from './components/PlacemarkMarker';
-import { PlacemarkInfoWindow } from './components/PlacemarkInfoWindow';
-import { DepartureMarker } from './components/DepartureMarker';
-import { MapLayers } from './components/MapLayers';
-import { RouteLayer } from './components/RouteLayer';
-import { MapControls } from './components/MapControls';
-import { MapEventBridge } from './components/MapEventBridge';
 import { PrintModal } from './components/PrintModal';
 import { JsonExportModal } from './components/JsonExportModal';
 import { MobileGuideModal } from './components/MobileGuideModal';
@@ -24,162 +16,6 @@ import {
   TravelMode,
   RouteResultDetails,
 } from './types/kml';
-
-// API key from environment variable only (no hardcoded keys)
-const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-
-// Inner Map view wrapper to access `useMap()`
-function MapContent({
-  filteredPlacemarks,
-  selectedPlacemark,
-  origin,
-  originLabel,
-  destination,
-  travelMode,
-  isPickingOnMap,
-  kmlDoc,
-  onSelectPlacemark,
-  onSetAsOrigin,
-  onSetAsDestination,
-  onCloseInfoWindow,
-  onRouteCalculated,
-  onRouteError,
-  onRouteLoadingChange,
-  onMapClickPoint,
-  onDragDeparture,
-  onOpenPrintModal,
-}: {
-  filteredPlacemarks: PlacemarkFeature[];
-  selectedPlacemark: PlacemarkFeature | null;
-  origin: LatLng | null;
-  originLabel: string;
-  destination: LatLng | null;
-  travelMode: TravelMode;
-  isPickingOnMap: boolean;
-  kmlDoc: KmlDocument;
-  onSelectPlacemark: (pm: PlacemarkFeature) => void;
-  onSetAsOrigin: (pm: PlacemarkFeature) => void;
-  onSetAsDestination: (pm: PlacemarkFeature) => void;
-  onCloseInfoWindow: () => void;
-  onRouteCalculated: (d: RouteResultDetails | null) => void;
-  onRouteError: (err: string | null) => void;
-  onRouteLoadingChange: (loading: boolean) => void;
-  onMapClickPoint: (pt: LatLng) => void;
-  onDragDeparture: (pt: LatLng) => void;
-  onOpenPrintModal: () => void;
-}) {
-  const map = useMap();
-
-  // Enquadra todos os pontos do KMZ
-  const handleFitBounds = useCallback(() => {
-    if (!map) return;
-
-    if (kmlDoc.bounds) {
-      map.fitBounds(kmlDoc.bounds, 60);
-    } else if (filteredPlacemarks.length > 0) {
-      const bounds = new google.maps.LatLngBounds();
-      filteredPlacemarks.forEach((pm) => {
-        if (pm.point) bounds.extend(pm.point);
-      });
-      map.fitBounds(bounds, 60);
-    }
-  }, [map, kmlDoc.bounds, filteredPlacemarks]);
-
-  // Auto-fit bounds on initial load
-  useEffect(() => {
-    if (map) {
-      handleFitBounds();
-    }
-  }, [map, handleFitBounds]);
-
-  // Request GPS and pan
-  const handleGpsCenter = useCallback(() => {
-    if (!map) return;
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          map.panTo(pt);
-          map.setZoom(15);
-        },
-        (err) => {
-          console.warn('Geolocation error:', err);
-        },
-        { enableHighAccuracy: true, timeout: 8000 }
-      );
-    }
-  }, [map]);
-
-  return (
-    <>
-      {/* KML Lines and Polygons */}
-      <MapLayers
-        placemarks={filteredPlacemarks}
-        onSelectPlacemark={onSelectPlacemark}
-      />
-
-      {/* Placemark Markers */}
-      {filteredPlacemarks.map((pm) => {
-        const isOrigin =
-          origin?.lat === pm.point?.lat && origin?.lng === pm.point?.lng;
-        const isDestination =
-          destination?.lat === pm.point?.lat &&
-          destination?.lng === pm.point?.lng;
-
-        return (
-          <PlacemarkMarker
-            key={pm.id}
-            placemark={pm}
-            isSelected={selectedPlacemark?.id === pm.id}
-            isOrigin={Boolean(isOrigin)}
-            isDestination={Boolean(isDestination)}
-            onClick={() => onSelectPlacemark(pm)}
-          />
-        );
-      })}
-
-      {/* Departure Marker (when custom point or GPS, distinct from placemark) */}
-      {origin && (
-        <DepartureMarker
-          position={origin}
-          label={originLabel}
-          onDragEnd={onDragDeparture}
-        />
-      )}
-
-      {/* InfoWindow popup */}
-      <PlacemarkInfoWindow
-        placemark={selectedPlacemark}
-        onClose={onCloseInfoWindow}
-        onSetAsOrigin={onSetAsOrigin}
-        onSetAsDestination={onSetAsDestination}
-      />
-
-      {/* Modern Routes calculation and polyline rendering */}
-      <RouteLayer
-        origin={origin}
-        destination={destination}
-        travelMode={travelMode}
-        onRouteCalculated={onRouteCalculated}
-        onError={onRouteError}
-        onLoadingChange={onRouteLoadingChange}
-      />
-
-      {/* Floating Map Controls */}
-      <MapControls
-        onFitBounds={handleFitBounds}
-        onRequestGps={handleGpsCenter}
-        onOpenPrintModal={onOpenPrintModal}
-      />
-
-      {/* Bridge to register clicks on map */}
-      <MapEventBridge
-        isPickingOnMap={isPickingOnMap}
-        onMapClickPoint={onMapClickPoint}
-      />
-    </>
-  );
-}
 
 export default function App() {
   // Initial fixed dataset: Pio IX - PI (83964)
@@ -501,61 +337,26 @@ export default function App() {
             </div>
           )}
 
-          {API_KEY ? (
-            <APIProvider apiKey={API_KEY} language="pt-BR" region="BR">
-              <Map
-                defaultCenter={initialCenter}
-                defaultZoom={10}
-                gestureHandling="greedy"
-                disableDefaultUI={false}
-                fullscreenControl={false}
-                streetViewControl={true}
-                style={{ width: '100%', height: '100%' }}
-              >
-                <MapContent
-                  filteredPlacemarks={filteredPlacemarks}
-                  selectedPlacemark={selectedPlacemark}
-                  origin={origin}
-                  originLabel={originLabel}
-                  destination={destination}
-                  travelMode={travelMode}
-                  isPickingOnMap={isPickingOnMap}
-                  kmlDoc={kmlDoc}
-                  onSelectPlacemark={handleSelectPlacemark}
-                  onSetAsOrigin={handleSetAsOrigin}
-                  onSetAsDestination={handleSetAsDestination}
-                  onCloseInfoWindow={handleCloseInfoWindow}
-                  onRouteCalculated={setRouteDetails}
-                  onRouteError={setRouteError}
-                  onRouteLoadingChange={setRouteLoading}
-                  onMapClickPoint={handleMapClickPoint}
-                  onDragDeparture={handleDragDeparture}
-                  onOpenPrintModal={() => setIsPrintModalOpen(true)}
-                />
-              </Map>
-            </APIProvider>
-          ) : (
-            <LeafletMapView
-              filteredPlacemarks={filteredPlacemarks}
-              selectedPlacemark={selectedPlacemark}
-              origin={origin}
-              originLabel={originLabel}
-              destination={destination}
-              travelMode={travelMode}
-              isPickingOnMap={isPickingOnMap}
-              kmlDoc={kmlDoc}
-              onSelectPlacemark={handleSelectPlacemark}
-              onSetAsOrigin={handleSetAsOrigin}
-              onSetAsDestination={handleSetAsDestination}
-              onCloseInfoWindow={handleCloseInfoWindow}
-              onRouteCalculated={setRouteDetails}
-              onRouteError={setRouteError}
-              onRouteLoadingChange={setRouteLoading}
-              onMapClickPoint={handleMapClickPoint}
-              onDragDeparture={handleDragDeparture}
-              onOpenPrintModal={() => setIsPrintModalOpen(true)}
-            />
-          )}
+          <LeafletMapView
+            filteredPlacemarks={filteredPlacemarks}
+            selectedPlacemark={selectedPlacemark}
+            origin={origin}
+            originLabel={originLabel}
+            destination={destination}
+            travelMode={travelMode}
+            isPickingOnMap={isPickingOnMap}
+            kmlDoc={kmlDoc}
+            onSelectPlacemark={handleSelectPlacemark}
+            onSetAsOrigin={handleSetAsOrigin}
+            onSetAsDestination={handleSetAsDestination}
+            onCloseInfoWindow={handleCloseInfoWindow}
+            onRouteCalculated={setRouteDetails}
+            onRouteError={setRouteError}
+            onRouteLoadingChange={setRouteLoading}
+            onMapClickPoint={handleMapClickPoint}
+            onDragDeparture={handleDragDeparture}
+            onOpenPrintModal={() => setIsPrintModalOpen(true)}
+          />
         </main>
       </div>
 
@@ -663,7 +464,6 @@ export default function App() {
         origin={origin}
         originLabel={originLabel}
         routeDetails={routeDetails}
-        apiKey={API_KEY}
       />
 
       {/* JSON / GeoJSON Converter Modal */}

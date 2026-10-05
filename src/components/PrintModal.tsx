@@ -33,7 +33,6 @@ interface PrintModalProps {
   origin: LatLng | null;
   originLabel: string;
   routeDetails: RouteResultDetails | null;
-  apiKey: string;
 }
 
 export function PrintModal({
