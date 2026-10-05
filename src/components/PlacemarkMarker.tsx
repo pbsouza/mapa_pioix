@@ -1,7 +1,6 @@
-import React from 'react';
-import { AdvancedMarker } from '@vis.gl/react-google-maps';
+import React, { useMemo } from 'react';
+import { Marker } from '@vis.gl/react-google-maps';
 import { PlacemarkFeature } from '../types/kml';
-import { MapPin, Navigation2, Flag } from 'lucide-react';
 
 interface PlacemarkMarkerProps {
   placemark: PlacemarkFeature;
@@ -20,91 +19,57 @@ export const PlacemarkMarker = React.memo(function PlacemarkMarker({
 }: PlacemarkMarkerProps) {
   if (!placemark.point) return null;
 
-  const color = placemark.categoryColor || '#2563eb';
+  const icon = useMemo(() => {
+    const color = isOrigin
+      ? '#059669' // emerald-600
+      : isDestination
+      ? '#e11d48' // rose-600
+      : isSelected
+      ? '#2563eb' // blue-600
+      : placemark.categoryColor || '#3b82f6';
+
+    const width = isSelected ? 36 : isOrigin || isDestination ? 34 : 28;
+    const height = Math.round(width * 1.28);
+    const strokeWidth = isSelected ? 2.5 : 2;
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 32 41">
+      <defs>
+        <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.4"/>
+        </filter>
+      </defs>
+      <path d="M16 1 C7.716 1 1 7.716 1 16 C1 25.5 16 40 16 40 C16 40 31 25.5 31 16 C31 7.716 24.284 1 16 1 Z" 
+            fill="${color}" stroke="#ffffff" stroke-width="${strokeWidth}" filter="url(#sh)"/>
+      <circle cx="16" cy="15" r="${isSelected ? 6.5 : 5.5}" fill="#ffffff"/>
+      ${
+        isOrigin
+          ? `<path d="M16 10 L19 18 L16 16.5 L13 18 Z" fill="${color}"/>`
+          : isDestination
+          ? `<path d="M13.5 10.5 H18.5 V15 H13.5 Z" fill="${color}"/>`
+          : ''
+      }
+    </svg>`;
+
+    return {
+      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+      scaledSize:
+        typeof google !== 'undefined' && google.maps?.Size
+          ? new google.maps.Size(width, height)
+          : undefined,
+      anchor:
+        typeof google !== 'undefined' && google.maps?.Point
+          ? new google.maps.Point(width / 2, height)
+          : undefined,
+    };
+  }, [placemark.categoryColor, isSelected, isOrigin, isDestination]);
 
   return (
-    <AdvancedMarker
+    <Marker
       position={{ lat: placemark.point.lat, lng: placemark.point.lng }}
       title={placemark.name}
       onClick={onClick}
+      icon={icon}
       zIndex={isSelected ? 50 : isOrigin || isDestination ? 40 : 10}
-    >
-      <div
-        className={`relative flex items-center justify-center transition-all duration-200 cursor-pointer group ${
-          isSelected
-            ? 'scale-125 -translate-y-2'
-            : isOrigin || isDestination
-            ? 'scale-115 -translate-y-1'
-            : 'hover:scale-110 hover:-translate-y-1'
-        }`}
-      >
-        {/* Glow for selected / route endpoints */}
-        {(isSelected || isOrigin || isDestination) && (
-          <span
-            className={`absolute -inset-1.5 rounded-full blur-xs opacity-75 animate-pulse ${
-              isOrigin ? 'bg-emerald-500' : isDestination ? 'bg-rose-500' : 'bg-blue-500'
-            }`}
-          />
-        )}
-
-        {/* Custom Marker Icon Pin */}
-        <div
-          className={`relative flex items-center justify-center rounded-full shadow-lg border-2 text-white transition-all ${
-            isOrigin
-              ? 'bg-emerald-600 border-white w-9 h-9'
-              : isDestination
-              ? 'bg-rose-600 border-white w-9 h-9'
-              : isSelected
-              ? 'bg-blue-600 border-white w-9 h-9 ring-2 ring-blue-400'
-              : 'w-7 h-7 border-white'
-          }`}
-          style={{ backgroundColor: !isOrigin && !isDestination && !isSelected ? color : undefined }}
-        >
-          {isOrigin ? (
-            <Navigation2 className="w-5 h-5 fill-current rotate-45" />
-          ) : isDestination ? (
-            <Flag className="w-4 h-4 fill-current" />
-          ) : placemark.iconUrl ? (
-            <img
-              src={placemark.iconUrl}
-              alt=""
-              className="w-4 h-4 object-contain rounded-full"
-              onError={(e) => {
-                // Fallback to pin icon on image error
-                (e.target as HTMLElement).style.display = 'none';
-              }}
-            />
-          ) : (
-            <MapPin className="w-4 h-4" />
-          )}
-        </div>
-
-        {/* Pin stem pointer */}
-        <div
-          className={`w-0 h-0 border-x-4 border-x-transparent border-t-6 -mt-0.5 mx-auto ${
-            isOrigin
-              ? 'border-t-emerald-600'
-              : isDestination
-              ? 'border-t-rose-600'
-              : isSelected
-              ? 'border-t-blue-600'
-              : ''
-          }`}
-          style={{
-            borderTopColor:
-              !isOrigin && !isDestination && !isSelected ? color : undefined,
-          }}
-        />
-
-        {/* Mini Label badge on hover or selected */}
-        <div
-          className={`absolute bottom-full mb-1 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-0.5 rounded text-[11px] font-medium tracking-tight shadow-md pointer-events-none transition-opacity bg-slate-900/90 text-white backdrop-blur-xs ${
-            isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-          }`}
-        >
-          {placemark.name}
-        </div>
-      </div>
-    </AdvancedMarker>
+    />
   );
 });

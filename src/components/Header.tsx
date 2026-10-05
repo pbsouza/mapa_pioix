@@ -12,6 +12,7 @@ import {
   MoreVertical,
   Check,
 } from 'lucide-react';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   fileName: string;
@@ -73,9 +74,11 @@ export function Header({
         </button>
 
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center shadow-sm shrink-0">
-            <MapPin className="w-4.5 h-4.5 text-white" />
-          </div>
+          <img
+            src="./icons/pwa-192x192.png"
+            alt="Rotas Pio IX"
+            className="w-8 h-8 rounded-lg object-cover shadow-sm shrink-0 border border-slate-700/60"
+          />
           <div className="min-w-0">
             <h1 className="text-xs sm:text-sm md:text-base font-bold tracking-tight text-white flex items-center gap-1.5 truncate">
               <span className="truncate">KMZ Viewer</span>
@@ -161,6 +164,8 @@ export function Header({
           <Upload className="w-3.5 h-3.5" />
           <span>Abrir KMZ</span>
         </button>
+
+        <PWAInstallButton />
       </div>
 
       {/* Mobile Actions (< md): Compact touch buttons + Dropdown */}
@@ -206,8 +211,12 @@ export function Header({
         {/* Dropdown Menu Modal for Mobile */}
         {mobileMenuOpen && (
           <div className="absolute top-14 right-2 w-64 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1 text-xs animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 border-b border-slate-800/80">
-              Ferramentas & Exportação
+            <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 border-b border-slate-800/80 flex items-center justify-between">
+              <span>Ferramentas & Exportação</span>
+            </div>
+
+            <div className="p-1">
+              <PWAInstallButton className="w-full justify-center" />
             </div>
 
             <button

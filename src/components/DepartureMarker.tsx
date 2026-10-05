@@ -1,6 +1,6 @@
-import { AdvancedMarker } from '@vis.gl/react-google-maps';
+import { useMemo } from 'react';
+import { Marker } from '@vis.gl/react-google-maps';
 import { LatLng } from '../types/kml';
-import { Navigation, Compass } from 'lucide-react';
 
 interface DepartureMarkerProps {
   position: LatLng;
@@ -15,37 +15,46 @@ export function DepartureMarker({
   isDraggable = true,
   onDragEnd,
 }: DepartureMarkerProps) {
+  const icon = useMemo(() => {
+    const width = 38;
+    const height = Math.round(width * 1.3);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 34 44">
+      <defs>
+        <filter id="dsh" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.45"/>
+        </filter>
+      </defs>
+      <path d="M17 1 C8.163 1 1 8.163 1 17 C1 27.5 17 43 17 43 C17 43 33 27.5 33 17 C33 8.163 25.837 1 17 1 Z" 
+            fill="#059669" stroke="#ffffff" stroke-width="2.5" filter="url(#dsh)"/>
+      <circle cx="17" cy="16" r="7" fill="#ffffff"/>
+      <circle cx="17" cy="16" r="4" fill="#059669"/>
+    </svg>`;
+
+    return {
+      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+      scaledSize:
+        typeof google !== 'undefined' && google.maps?.Size
+          ? new google.maps.Size(width, height)
+          : undefined,
+      anchor:
+        typeof google !== 'undefined' && google.maps?.Point
+          ? new google.maps.Point(width / 2, height)
+          : undefined,
+    };
+  }, []);
+
   return (
-    <AdvancedMarker
+    <Marker
       position={{ lat: position.lat, lng: position.lng }}
       title={label}
       draggable={isDraggable}
+      icon={icon}
       onDragEnd={(e) => {
         if (e.latLng && onDragEnd) {
           onDragEnd({ lat: e.latLng.lat(), lng: e.latLng.lng() });
         }
       }}
       zIndex={60}
-    >
-      <div className="relative flex flex-col items-center cursor-grab active:cursor-grabbing group">
-        {/* Pulsing beacon */}
-        <span className="absolute -inset-2 rounded-full bg-emerald-400/40 animate-ping" />
-
-        {/* Pin circle */}
-        <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-emerald-600 text-white shadow-xl border-2 border-white ring-4 ring-emerald-500/30">
-          <Navigation className="w-5 h-5 fill-current" />
-        </div>
-
-        {/* Pin point */}
-        <div className="w-0 h-0 border-x-4 border-x-transparent border-t-6 border-t-emerald-600 -mt-0.5" />
-
-        {/* Label Tag */}
-        <div className="mt-1 px-2.5 py-0.5 rounded-full bg-slate-900/90 text-white text-[11px] font-semibold shadow-md whitespace-nowrap backdrop-blur-xs flex items-center gap-1 border border-white/20">
-          <Compass className="w-3 h-3 text-emerald-400" />
-          <span>{label}</span>
-          {isDraggable && <span className="text-[9px] text-slate-400">(arraste)</span>}
-        </div>
-      </div>
-    </AdvancedMarker>
+    />
   );
 }

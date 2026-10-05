@@ -2,14 +2,73 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import {VitePWA} from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   return {
     base: './',
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: [
+          'favicon.ico',
+          'icons/apple-touch-icon.png',
+          'icons/pwa-192x192.png',
+          'icons/pwa-512x512.png',
+          'icons/pwa-maskable-512x512.png',
+        ],
+        manifest: {
+          id: './',
+          name: 'Rotas - Pio IX (KMZ Viewer)',
+          short_name: 'RotasPioIX',
+          description: 'Visualizador interativo de arquivos KMZ/KML e rotas no mapa de Pio IX - PI.',
+          theme_color: '#0f172a',
+          background_color: '#020617',
+          display: 'standalone',
+          orientation: 'portrait-primary',
+          start_url: './',
+          scope: './',
+          icons: [
+            {
+              src: './icons/pwa-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: './icons/pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: './icons/pwa-maskable-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+            {
+              src: './icons/apple-touch-icon.png',
+              sizes: '180x180',
+              type: 'image/png',
+              purpose: 'any',
+            },
+          ],
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,jpg,jpeg,svg,woff,woff2}'],
+        },
+        devOptions: {
+          enabled: true,
+          type: 'module',
+        },
+      }),
+    ],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       },
     },
     server: {

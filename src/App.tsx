@@ -13,6 +13,7 @@ import { MapEventBridge } from './components/MapEventBridge';
 import { PrintModal } from './components/PrintModal';
 import { JsonExportModal } from './components/JsonExportModal';
 import { MobileGuideModal } from './components/MobileGuideModal';
+import { LeafletMapView } from './components/LeafletMapView';
 import { getSampleDataset } from './data/sampleKmz';
 import { getPioIxDataset } from './data/pioIxData';
 import { parseKmzOrKml } from './utils/kmzParser';
@@ -24,7 +25,8 @@ import {
   RouteResultDetails,
 } from './types/kml';
 
-const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyA1L2a5Fc6F9LlFTFAwNtLkVuZgu2HzG_U';
+// API key from environment variable only (no hardcoded keys)
+const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 // Inner Map view wrapper to access `useMap()`
 function MapContent({
@@ -499,40 +501,61 @@ export default function App() {
             </div>
           )}
 
-          <APIProvider apiKey={API_KEY} language="pt-BR" region="BR">
-            <Map
-              mapId="DEMO_MAP_ID"
-              internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
-              defaultCenter={initialCenter}
-              defaultZoom={10}
-              gestureHandling="greedy"
-              disableDefaultUI={false}
-              fullscreenControl={false}
-              streetViewControl={true}
-              style={{ width: '100%', height: '100%' }}
-            >
-              <MapContent
-                filteredPlacemarks={filteredPlacemarks}
-                selectedPlacemark={selectedPlacemark}
-                origin={origin}
-                originLabel={originLabel}
-                destination={destination}
-                travelMode={travelMode}
-                isPickingOnMap={isPickingOnMap}
-                kmlDoc={kmlDoc}
-                onSelectPlacemark={handleSelectPlacemark}
-                onSetAsOrigin={handleSetAsOrigin}
-                onSetAsDestination={handleSetAsDestination}
-                onCloseInfoWindow={handleCloseInfoWindow}
-                onRouteCalculated={setRouteDetails}
-                onRouteError={setRouteError}
-                onRouteLoadingChange={setRouteLoading}
-                onMapClickPoint={handleMapClickPoint}
-                onDragDeparture={handleDragDeparture}
-                onOpenPrintModal={() => setIsPrintModalOpen(true)}
-              />
-            </Map>
-          </APIProvider>
+          {API_KEY ? (
+            <APIProvider apiKey={API_KEY} language="pt-BR" region="BR">
+              <Map
+                defaultCenter={initialCenter}
+                defaultZoom={10}
+                gestureHandling="greedy"
+                disableDefaultUI={false}
+                fullscreenControl={false}
+                streetViewControl={true}
+                style={{ width: '100%', height: '100%' }}
+              >
+                <MapContent
+                  filteredPlacemarks={filteredPlacemarks}
+                  selectedPlacemark={selectedPlacemark}
+                  origin={origin}
+                  originLabel={originLabel}
+                  destination={destination}
+                  travelMode={travelMode}
+                  isPickingOnMap={isPickingOnMap}
+                  kmlDoc={kmlDoc}
+                  onSelectPlacemark={handleSelectPlacemark}
+                  onSetAsOrigin={handleSetAsOrigin}
+                  onSetAsDestination={handleSetAsDestination}
+                  onCloseInfoWindow={handleCloseInfoWindow}
+                  onRouteCalculated={setRouteDetails}
+                  onRouteError={setRouteError}
+                  onRouteLoadingChange={setRouteLoading}
+                  onMapClickPoint={handleMapClickPoint}
+                  onDragDeparture={handleDragDeparture}
+                  onOpenPrintModal={() => setIsPrintModalOpen(true)}
+                />
+              </Map>
+            </APIProvider>
+          ) : (
+            <LeafletMapView
+              filteredPlacemarks={filteredPlacemarks}
+              selectedPlacemark={selectedPlacemark}
+              origin={origin}
+              originLabel={originLabel}
+              destination={destination}
+              travelMode={travelMode}
+              isPickingOnMap={isPickingOnMap}
+              kmlDoc={kmlDoc}
+              onSelectPlacemark={handleSelectPlacemark}
+              onSetAsOrigin={handleSetAsOrigin}
+              onSetAsDestination={handleSetAsDestination}
+              onCloseInfoWindow={handleCloseInfoWindow}
+              onRouteCalculated={setRouteDetails}
+              onRouteError={setRouteError}
+              onRouteLoadingChange={setRouteLoading}
+              onMapClickPoint={handleMapClickPoint}
+              onDragDeparture={handleDragDeparture}
+              onOpenPrintModal={() => setIsPrintModalOpen(true)}
+            />
+          )}
         </main>
       </div>
 
