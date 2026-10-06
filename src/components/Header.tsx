@@ -11,6 +11,7 @@ import {
   Smartphone,
   MoreVertical,
   Check,
+  HardDrive,
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 
@@ -27,6 +28,7 @@ interface HeaderProps {
   onOpenPrintModal: () => void;
   onOpenJsonModal: () => void;
   onOpenMobileGuide: () => void;
+  onOpenOfflineModal: () => void;
 }
 
 export function Header({
@@ -42,6 +44,7 @@ export function Header({
   onOpenPrintModal,
   onOpenJsonModal,
   onOpenMobileGuide,
+  onOpenOfflineModal,
 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -139,6 +142,15 @@ export function Header({
         </button>
 
         <button
+          onClick={onOpenOfflineModal}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-amber-500/40"
+          title="Configurar modo offline e baixar blocos do mapa"
+        >
+          <HardDrive className="w-3.5 h-3.5 text-amber-400" />
+          <span>Mapa Offline</span>
+        </button>
+
+        <button
           onClick={onOpenJsonModal}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-indigo-500"
           title="Converter e exportar para GeoJSON ou JSON"
@@ -233,6 +245,20 @@ export function Header({
               <div>
                 <div className="font-semibold">Abrir Arquivo KMZ</div>
                 <div className="text-[10px] text-slate-400">Carregar outro mapa ou camada</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onOpenOfflineModal();
+              }}
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white transition-colors text-left"
+            >
+              <HardDrive className="w-4 h-4 text-amber-400 shrink-0" />
+              <div>
+                <div className="font-semibold text-amber-300">Modo Offline & Cache</div>
+                <div className="text-[10px] text-slate-400">Baixar mapa para usar sem internet</div>
               </div>
             </button>
 

@@ -4,7 +4,7 @@ import { RoutePanel } from './RoutePanel';
 import { KmzUploader } from './KmzUploader';
 import { PWAInstallButton } from './PWAInstallButton';
 import { KmlDocument, PlacemarkFeature, LatLng, TravelMode, RouteResultDetails } from '../types/kml';
-import { MapPin, Navigation, Upload, Layers, Printer, FileJson, X, ChevronLeft } from 'lucide-react';
+import { MapPin, Navigation, Upload, Layers, Printer, FileJson, X, ChevronLeft, HardDrive } from 'lucide-react';
 
 interface SidebarProps {
   kmlDoc: KmlDocument;
@@ -43,6 +43,7 @@ interface SidebarProps {
   onLoadSample: (sampleId: string) => void;
   onOpenPrintModal: () => void;
   onOpenJsonModal: () => void;
+  onOpenOfflineModal?: () => void;
   uploadError?: string | null;
   onClearUploadError?: () => void;
 }
@@ -84,6 +85,7 @@ export function Sidebar({
   onLoadSample,
   onOpenPrintModal,
   onOpenJsonModal,
+  onOpenOfflineModal,
   uploadError,
   onClearUploadError,
 }: SidebarProps) {
@@ -265,6 +267,17 @@ export function Sidebar({
               <FileJson className="w-3.5 h-3.5 text-indigo-600" />
               <span>Exportar JSON</span>
             </button>
+
+            {onOpenOfflineModal && (
+              <button
+                onClick={onOpenOfflineModal}
+                className="py-2 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer col-span-2 shadow-2xs"
+                title="Configurar modo offline e baixar blocos do mapa para uso sem internet"
+              >
+                <HardDrive className="w-3.5 h-3.5 text-amber-600" />
+                <span>Mapa Offline & Cache</span>
+              </button>
+            )}
           </div>
         </div>
       </aside>

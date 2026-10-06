@@ -19,6 +19,7 @@ import {
   Share2,
   ExternalLink,
   X,
+  HardDrive,
 } from 'lucide-react';
 import { createWhatsAppUrl } from '../utils/pdfGenerator';
 
@@ -41,6 +42,7 @@ interface LeafletMapViewProps {
   onMapClickPoint: (pt: LatLng) => void;
   onDragDeparture: (pt: LatLng) => void;
   onOpenPrintModal: () => void;
+  onOpenOfflineModal: () => void;
 }
 
 // Distance helper
@@ -77,6 +79,7 @@ export function LeafletMapView({
   onMapClickPoint,
   onDragDeparture,
   onOpenPrintModal,
+  onOpenOfflineModal,
 }: LeafletMapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -89,6 +92,10 @@ export function LeafletMapView({
   const [mapType, setMapType] = useState<'streets' | 'topo' | 'satellite'>('streets');
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
+  // SVG fallback tile displayed when user is offline and tile was not pre-cached
+  const errorTileFallback =
+    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="%230f172a" stroke="%231e293b" stroke-width="1"/><path d="M60 128h136M128 60v136" stroke="%231e293b" stroke-width="0.5"/><text x="128" y="125" fill="%2364748b" font-family="sans-serif" font-size="11" font-weight="bold" text-anchor="middle">Modo Offline</text><text x="128" y="142" fill="%23475569" font-family="sans-serif" font-size="9" text-anchor="middle">Conecte para baixar</text></svg>';
+
   // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
@@ -100,12 +107,13 @@ export function LeafletMapView({
       attributionControl: false,
     });
 
-    // Custom dark / modern tile layer
+    // Custom dark / modern tile layer with offline fallback
     const standardLayer = L.tileLayer(
       'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors',
+        errorTileUrl: errorTileFallback,
       }
     ).addTo(map);
 
@@ -149,7 +157,10 @@ export function LeafletMapView({
       maxZoom = 19;
     }
 
-    const newLayer = L.tileLayer(url, { maxZoom }).addTo(map);
+    const newLayer = L.tileLayer(url, {
+      maxZoom,
+      errorTileUrl: errorTileFallback,
+    }).addTo(map);
     tileLayerRef.current = newLayer;
   }, [mapType]);
 
@@ -544,6 +555,14 @@ export function LeafletMapView({
           title="Imprimir mapa / Exportar PDF"
         >
           <Printer className="w-4.5 h-4.5" />
+        </button>
+
+        <button
+          onClick={onOpenOfflineModal}
+          className="w-10 h-10 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-400 hover:text-amber-300 flex items-center justify-center shadow-lg border border-slate-700/80 transition-all cursor-pointer backdrop-blur-xs"
+          title="Modo Offline & Cache do Mapa"
+        >
+          <HardDrive className="w-4.5 h-4.5" />
         </button>
       </div>
 

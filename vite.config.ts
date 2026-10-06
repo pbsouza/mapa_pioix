@@ -62,6 +62,84 @@ export default defineConfig(() => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,jpg,jpeg,svg,woff,woff2}'],
+          runtimeCaching: [
+            {
+              // OpenStreetMap tiles
+              urlPattern: /^https:\/\/[a-c]\.tile\.openstreetmap\.org\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'osm-tiles-cache',
+                expiration: {
+                  maxEntries: 4000,
+                  maxAgeSeconds: 60 * 24 * 60 * 60, // 60 days
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              // CartoDB tiles
+              urlPattern: /^https:\/\/.*\.basemaps\.cartocdn\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'carto-tiles-cache',
+                expiration: {
+                  maxEntries: 4000,
+                  maxAgeSeconds: 60 * 24 * 60 * 60,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              // Esri Satellite tiles
+              urlPattern: /^https:\/\/server\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'esri-tiles-cache',
+                expiration: {
+                  maxEntries: 3000,
+                  maxAgeSeconds: 60 * 24 * 60 * 60,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              // OpenTopoMap
+              urlPattern: /^https:\/\/.*\.tile\.opentopomap\.org\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'topo-tiles-cache',
+                expiration: {
+                  maxEntries: 1500,
+                  maxAgeSeconds: 60 * 24 * 60 * 60,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              // OSRM routing API caching
+              urlPattern: /^https:\/\/router\.project-osrm\.org\/.*/i,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'osrm-routes-cache',
+                networkTimeoutSeconds: 3,
+                expiration: {
+                  maxEntries: 200,
+                  maxAgeSeconds: 30 * 24 * 60 * 60,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+          ],
         },
         devOptions: {
           enabled: true,

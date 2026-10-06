@@ -5,6 +5,8 @@ import { Sidebar } from './components/Sidebar';
 import { PrintModal } from './components/PrintModal';
 import { JsonExportModal } from './components/JsonExportModal';
 import { MobileGuideModal } from './components/MobileGuideModal';
+import { OfflineMapModal } from './components/OfflineMapModal';
+import { OfflineStatusBanner } from './components/OfflineStatusBanner';
 import { LeafletMapView } from './components/LeafletMapView';
 import { getSampleDataset } from './data/sampleKmz';
 import { getPioIxDataset } from './data/pioIxData';
@@ -40,6 +42,7 @@ export default function App() {
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
   const [isMobileGuideOpen, setIsMobileGuideOpen] = useState(false);
+  const [isOfflineModalOpen, setIsOfflineModalOpen] = useState(false);
 
   // Routing state
   const [origin, setOrigin] = useState<LatLng | null>(null);
@@ -272,6 +275,7 @@ export default function App() {
         onOpenPrintModal={() => setIsPrintModalOpen(true)}
         onOpenJsonModal={() => setIsJsonModalOpen(true)}
         onOpenMobileGuide={() => setIsMobileGuideOpen(true)}
+        onOpenOfflineModal={() => setIsOfflineModalOpen(true)}
       />
 
       {/* Main Workspace: Sidebar + Map */}
@@ -313,6 +317,7 @@ export default function App() {
           onLoadSample={handleLoadSample}
           onOpenPrintModal={() => setIsPrintModalOpen(true)}
           onOpenJsonModal={() => setIsJsonModalOpen(true)}
+          onOpenOfflineModal={() => setIsOfflineModalOpen(true)}
           uploadError={fileUploadError}
           onClearUploadError={() => setFileUploadError(null)}
           onCloseSidebar={() => setSidebarOpen(false)}
@@ -320,6 +325,9 @@ export default function App() {
 
         {/* Map Container */}
         <main className="flex-1 relative h-full w-full bg-slate-900 pb-14 md:pb-0">
+          {/* Offline Status Alert Banner */}
+          <OfflineStatusBanner onOpenOfflineModal={() => setIsOfflineModalOpen(true)} />
+
           {fileUploadError && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 max-w-md w-[92%] bg-rose-900/95 text-white p-3 rounded-xl shadow-xl border border-rose-700/80 backdrop-blur-md flex items-start gap-2.5">
               <AlertCircle className="w-5 h-5 text-rose-300 shrink-0 mt-0.5" />
@@ -356,6 +364,7 @@ export default function App() {
             onMapClickPoint={handleMapClickPoint}
             onDragDeparture={handleDragDeparture}
             onOpenPrintModal={() => setIsPrintModalOpen(true)}
+            onOpenOfflineModal={() => setIsOfflineModalOpen(true)}
           />
         </main>
       </div>
@@ -479,6 +488,12 @@ export default function App() {
       <MobileGuideModal
         isOpen={isMobileGuideOpen}
         onClose={() => setIsMobileGuideOpen(false)}
+      />
+
+      {/* Offline Map Cache Manager Modal */}
+      <OfflineMapModal
+        isOpen={isOfflineModalOpen}
+        onClose={() => setIsOfflineModalOpen(false)}
       />
     </div>
   );
