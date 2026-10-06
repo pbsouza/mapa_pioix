@@ -2,6 +2,7 @@ import { CategoryFilter } from './CategoryFilter';
 import { PlacemarkList } from './PlacemarkList';
 import { RoutePanel } from './RoutePanel';
 import { KmzUploader } from './KmzUploader';
+import { PWAInstallButton } from './PWAInstallButton';
 import { KmlDocument, PlacemarkFeature, LatLng, TravelMode, RouteResultDetails } from '../types/kml';
 import { MapPin, Navigation, Upload, Layers, Printer, FileJson, X, ChevronLeft } from 'lucide-react';
 
@@ -120,6 +121,11 @@ export function Sidebar({
             <ChevronLeft className="w-4 h-4 text-cyan-400" />
             <span>Ver Mapa</span>
           </button>
+        </div>
+
+        {/* Mobile Install App banner */}
+        <div className="px-2.5 py-2 bg-slate-50 border-b border-slate-200 md:hidden">
+          <PWAInstallButton variant="sidebar" />
         </div>
 
         {/* Navigation Tabs */}

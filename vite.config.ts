@@ -14,13 +14,16 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: [
           'favicon.ico',
+          'favicon.svg',
+          'favicon.png',
+          'icons/favicon-64x64.png',
           'icons/apple-touch-icon.png',
           'icons/pwa-192x192.png',
           'icons/pwa-512x512.png',
           'icons/pwa-maskable-512x512.png',
         ],
         manifest: {
-          id: '/kmz-rotas-pioix-v3',
+          id: '/kmz-pioix-v4',
           name: 'Rotas - Pio IX (KMZ Viewer)',
           short_name: 'RotasPioIX',
           description: 'Visualizador interativo de arquivos KMZ/KML e rotas no mapa de Pio IX - PI.',
@@ -28,7 +31,7 @@ export default defineConfig(() => {
           background_color: '#020617',
           display: 'standalone',
           orientation: 'portrait-primary',
-          start_url: './',
+          start_url: './?utm_source=pwa_app_v4',
           scope: './',
           icons: [
             {

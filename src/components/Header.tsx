@@ -170,20 +170,23 @@ export function Header({
 
       {/* Mobile Actions (< md): Compact touch buttons + Dropdown */}
       <div className="flex md:hidden items-center gap-1.5" ref={menuRef}>
+        {/* Direct Install button on mobile */}
+        <PWAInstallButton variant="compact" />
+
         {/* Quick GPS button on mobile */}
         <button
           onClick={onRequestGps}
-          className="w-10 h-10 rounded-lg bg-slate-800 active:bg-slate-700 text-slate-200 flex items-center justify-center transition-colors border border-slate-700 shrink-0"
+          className="w-9 h-9 rounded-lg bg-slate-800 active:bg-slate-700 text-slate-200 flex items-center justify-center transition-colors border border-slate-700 shrink-0"
           title="Detectar minha localização GPS"
           aria-label="Minha Localização GPS"
         >
-          <Navigation className="w-4.5 h-4.5 text-emerald-400" />
+          <Navigation className="w-4 h-4 text-emerald-400" />
         </button>
 
         {/* Quick Route button on mobile */}
         <button
           onClick={onOpenRouteTab}
-          className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors border shrink-0 ${
+          className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors border shrink-0 ${
             hasActiveRoute
               ? 'bg-blue-600 text-white border-blue-400 animate-pulse'
               : 'bg-slate-800 active:bg-slate-700 text-cyan-300 border-slate-700'
@@ -191,13 +194,13 @@ export function Header({
           title="Traçar Rotas"
           aria-label="Traçar Rotas"
         >
-          <Route className="w-4.5 h-4.5" />
+          <Route className="w-4 h-4" />
         </button>
 
         {/* More Tools Menu Trigger */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors border shrink-0 ${
+          className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors border shrink-0 ${
             mobileMenuOpen
               ? 'bg-blue-600 text-white border-blue-500'
               : 'bg-slate-800 active:bg-slate-700 text-slate-200 border-slate-700'
@@ -205,18 +208,18 @@ export function Header({
           title="Mais opções e exportações"
           aria-label="Mais opções"
         >
-          <MoreVertical className="w-4.5 h-4.5" />
+          <MoreVertical className="w-4 h-4" />
         </button>
 
         {/* Dropdown Menu Modal for Mobile */}
         {mobileMenuOpen && (
-          <div className="absolute top-14 right-2 w-64 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1 text-xs animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 border-b border-slate-800/80 flex items-center justify-between">
-              <span>Ferramentas & Exportação</span>
+          <div className="absolute top-14 right-2 w-72 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-2.5 z-50 flex flex-col gap-1.5 text-xs animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-2 py-1 text-[11px] font-semibold text-slate-400 border-b border-slate-800/80 flex items-center justify-between">
+              <span>Opções do Aplicativo</span>
             </div>
 
-            <div className="p-1">
-              <PWAInstallButton className="w-full justify-center" />
+            <div className="py-1">
+              <PWAInstallButton variant="sidebar" className="w-full" />
             </div>
 
             <button
