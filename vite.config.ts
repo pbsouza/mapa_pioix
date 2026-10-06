@@ -23,7 +23,7 @@ export default defineConfig(() => {
           'icons/pwa-maskable-512x512.png',
         ],
         manifest: {
-          id: '/kmz-pioix-v4',
+          id: './?pwa=pioix',
           name: 'Rotas - Pio IX (KMZ Viewer)',
           short_name: 'RotasPioIX',
           description: 'Visualizador interativo de arquivos KMZ/KML e rotas no mapa de Pio IX - PI.',
