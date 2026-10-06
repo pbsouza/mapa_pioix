@@ -7,6 +7,9 @@ import {
   LatLng,
   TravelMode,
   RouteResultDetails,
+  RouteStep,
+  RouteAlternative,
+  LiveNavigationState,
 } from '../types/kml';
 import {
   Navigation,
@@ -22,6 +25,19 @@ import {
   HardDrive,
 } from 'lucide-react';
 import { createWhatsAppUrl } from '../utils/pdfGenerator';
+import { ActiveRouteOverlay } from './ActiveRouteOverlay';
+import {
+  parseOsrmSteps,
+  generateOfflineSteps,
+  generateOfflineAlternatives,
+  extractHighwaysFromSteps,
+  buildHighwaySummary,
+  inferOfflineHighways,
+  findUpcomingManeuver,
+  calculateBearing,
+  formatDistance,
+  formatDuration,
+} from '../utils/routeGuidance';
 
 interface LeafletMapViewProps {
   filteredPlacemarks: PlacemarkFeature[];
@@ -29,7 +45,9 @@ interface LeafletMapViewProps {
   origin: LatLng | null;
   originLabel: string;
   destination: LatLng | null;
+  destinationLabel: string;
   travelMode: TravelMode;
+  routeDetails: RouteResultDetails | null;
   isPickingOnMap: boolean;
   kmlDoc: KmlDocument;
   onSelectPlacemark: (pm: PlacemarkFeature) => void;
@@ -39,10 +57,12 @@ interface LeafletMapViewProps {
   onRouteCalculated: (d: RouteResultDetails | null) => void;
   onRouteError: (err: string | null) => void;
   onRouteLoadingChange: (loading: boolean) => void;
+  onClearRoute: () => void;
   onMapClickPoint: (pt: LatLng) => void;
   onDragDeparture: (pt: LatLng) => void;
   onOpenPrintModal: () => void;
   onOpenOfflineModal: () => void;
+  onSelectAlternative?: (index: number) => void;
 }
 
 // Distance helper
@@ -66,7 +86,9 @@ export function LeafletMapView({
   origin,
   originLabel,
   destination,
+  destinationLabel,
   travelMode,
+  routeDetails,
   isPickingOnMap,
   kmlDoc,
   onSelectPlacemark,
@@ -76,10 +98,12 @@ export function LeafletMapView({
   onRouteCalculated,
   onRouteError,
   onRouteLoadingChange,
+  onClearRoute,
   onMapClickPoint,
   onDragDeparture,
   onOpenPrintModal,
   onOpenOfflineModal,
+  onSelectAlternative: onSelectAlternativeProp,
 }: LeafletMapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -89,8 +113,69 @@ export function LeafletMapView({
   const departureMarkerRef = useRef<L.Marker | null>(null);
   const userGpsMarkerRef = useRef<L.CircleMarker | null>(null);
 
+  // Live Real-Time Navigation State
+  const [isLiveNavigating, setIsLiveNavigating] = useState(false);
+  const [liveNavState, setLiveNavState] = useState<LiveNavigationState>({
+    isActive: false,
+    currentLocation: null,
+    heading: null,
+    speedKmh: null,
+    altitude: null,
+    accuracy: null,
+    remainingDistanceMeters: null,
+    remainingDurationSeconds: null,
+    nextStep: null,
+  });
+
+  const watchIdRef = useRef<number | null>(null);
+  const prevPosRef = useRef<LatLng | null>(null);
+  const prevTimeRef = useRef<number>(0);
+  const liveVehicleMarkerRef = useRef<L.Marker | null>(null);
+  const liveAccuracyCircleRef = useRef<L.Circle | null>(null);
+  const breadcrumbLineRef = useRef<L.Polyline | null>(null);
+  const breadcrumbsRef = useRef<[number, number][]>([]);
+
+  // Cached alternatives
+  const calculatedAlternativesRef = useRef<RouteAlternative[]>([]);
+  const selectedAltIndexRef = useRef<number>(0);
+
   const [mapType, setMapType] = useState<'streets' | 'topo' | 'satellite'>('streets');
   const tileLayerRef = useRef<L.TileLayer | null>(null);
+
+  // Stop live navigation and cleanup markers/watchers
+  const handleStopLiveNav = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    if (liveVehicleMarkerRef.current && mapInstanceRef.current) {
+      mapInstanceRef.current.removeLayer(liveVehicleMarkerRef.current);
+      liveVehicleMarkerRef.current = null;
+    }
+    if (liveAccuracyCircleRef.current && mapInstanceRef.current) {
+      mapInstanceRef.current.removeLayer(liveAccuracyCircleRef.current);
+      liveAccuracyCircleRef.current = null;
+    }
+    if (breadcrumbLineRef.current && mapInstanceRef.current) {
+      mapInstanceRef.current.removeLayer(breadcrumbLineRef.current);
+      breadcrumbLineRef.current = null;
+    }
+    breadcrumbsRef.current = [];
+    prevPosRef.current = null;
+    prevTimeRef.current = 0;
+    setIsLiveNavigating(false);
+    setLiveNavState({
+      isActive: false,
+      currentLocation: null,
+      heading: null,
+      speedKmh: null,
+      altitude: null,
+      accuracy: null,
+      remainingDistanceMeters: null,
+      remainingDurationSeconds: null,
+      nextStep: null,
+    });
+  }, []);
 
   // SVG fallback tile displayed when user is offline and tile was not pre-cached
   const errorTileFallback =
@@ -132,10 +217,11 @@ export function LeafletMapView({
     mapInstanceRef.current = map;
 
     return () => {
+      handleStopLiveNav();
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, [onMapClickPoint]);
+  }, [onMapClickPoint, handleStopLiveNav]);
 
   // Handle Map Type Switching
   useEffect(() => {
@@ -341,12 +427,255 @@ export function LeafletMapView({
     }
   }, [origin, originLabel, onDragDeparture]);
 
+  // Recenter map on user during live navigation
+  const handleRecenterOnUser = useCallback(() => {
+    if (liveNavState.currentLocation && mapInstanceRef.current) {
+      mapInstanceRef.current.setView(
+        [liveNavState.currentLocation.lat, liveNavState.currentLocation.lng],
+        16,
+        { animate: true }
+      );
+    }
+  }, [liveNavState.currentLocation]);
+
+  // Select route alternative and update map layers
+  const handleSelectAlternative = useCallback(
+    (index: number) => {
+      const alternatives = calculatedAlternativesRef.current;
+      if (!alternatives || alternatives.length === 0 || !alternatives[index]) return;
+
+      selectedAltIndexRef.current = index;
+      const selectedAlt = alternatives[index];
+
+      // Redraw map routes
+      if (routeLayerRef.current) {
+        routeLayerRef.current.clearLayers();
+
+        // 1. Draw inactive alternatives as clickable muted dashed lines
+        alternatives.forEach((alt, idx) => {
+          if (idx !== index) {
+            const altLine = L.polyline(alt.coordinates, {
+              color: '#64748b',
+              weight: 5,
+              opacity: 0.65,
+              dashArray: '8, 8',
+              lineCap: 'round',
+            });
+            altLine.on('click', () => {
+              handleSelectAlternative(idx);
+            });
+            routeLayerRef.current?.addLayer(altLine);
+          }
+        });
+
+        // 2. Draw active selected route with glowing black casing + cyan path
+        const casing = L.polyline(selectedAlt.coordinates, {
+          color: '#0f172a',
+          weight: 8,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round',
+        });
+        const line = L.polyline(selectedAlt.coordinates, {
+          color: '#06b6d4',
+          weight: 5,
+          opacity: 0.95,
+          lineCap: 'round',
+          lineJoin: 'round',
+        });
+
+        routeLayerRef.current.addLayer(casing);
+        routeLayerRef.current.addLayer(line);
+
+        mapInstanceRef.current?.fitBounds(line.getBounds(), {
+          padding: [70, 70],
+        });
+      }
+
+      onRouteCalculated({
+        distanceMeters: selectedAlt.distanceMeters,
+        durationMillis: selectedAlt.durationMillis,
+        distanceText: selectedAlt.distanceText,
+        durationText: selectedAlt.durationText,
+        summary: selectedAlt.summary,
+        highways: selectedAlt.highways,
+        steps: selectedAlt.steps,
+        alternatives,
+        selectedAlternativeIndex: index,
+      });
+
+      if (onSelectAlternativeProp) {
+        onSelectAlternativeProp(index);
+      }
+    },
+    [onRouteCalculated, onSelectAlternativeProp]
+  );
+
+  // Toggle Real-Time Live Navigation with continuous geolocation tracking
+  const handleToggleLiveNavigation = useCallback(() => {
+    if (isLiveNavigating) {
+      handleStopLiveNav();
+      return;
+    }
+
+    if (!('geolocation' in navigator)) {
+      alert('Geolocalização não é suportada pelo seu dispositivo.');
+      return;
+    }
+
+    setIsLiveNavigating(true);
+    breadcrumbsRef.current = [];
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const curPos: LatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const now = Date.now();
+        const accuracy = pos.coords.accuracy || 15;
+        const altitude = pos.coords.altitude || null;
+
+        // Calculate speed (km/h)
+        let speedKmh: number | null = null;
+        if (pos.coords.speed !== null && pos.coords.speed > 0) {
+          speedKmh = pos.coords.speed * 3.6;
+        } else if (prevPosRef.current && prevTimeRef.current > 0) {
+          const deltaSec = (now - prevTimeRef.current) / 1000;
+          if (deltaSec > 0.5) {
+            const dist = haversineDistance(prevPosRef.current, curPos);
+            speedKmh = (dist / deltaSec) * 3.6;
+          }
+        }
+
+        // Calculate heading (degrees 0-360)
+        let heading: number | null = null;
+        if (pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
+          heading = pos.coords.heading;
+        } else if (prevPosRef.current) {
+          const distMoved = haversineDistance(prevPosRef.current, curPos);
+          if (distMoved > 2) {
+            heading = calculateBearing(prevPosRef.current, curPos);
+          }
+        }
+
+        prevPosRef.current = curPos;
+        prevTimeRef.current = now;
+
+        // Remaining metrics to destination
+        let remainingDistanceMeters: number | null = null;
+        let remainingDurationSeconds: number | null = null;
+        if (destination) {
+          remainingDistanceMeters = haversineDistance(curPos, destination);
+          const currentSpeedMps = speedKmh && speedKmh > 5 ? speedKmh / 3.6 : 13.8; // ~50 km/h default
+          remainingDurationSeconds = remainingDistanceMeters / currentSpeedMps;
+        }
+
+        // Upcoming maneuver from active steps
+        const currentSteps = routeDetails?.steps || [];
+        const upcoming = findUpcomingManeuver(curPos, currentSteps);
+        const nextStep = upcoming?.step || null;
+
+        setLiveNavState({
+          isActive: true,
+          currentLocation: curPos,
+          heading,
+          speedKmh,
+          altitude,
+          accuracy,
+          remainingDistanceMeters,
+          remainingDurationSeconds,
+          nextStep,
+        });
+
+        // Update map vehicle puck & position
+        const map = mapInstanceRef.current;
+        if (!map) return;
+
+        const angle = heading ?? 0;
+        const puckHtml = `
+          <div style="position: relative; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
+            <div style="position: absolute; inset: 0; border-radius: 9999px; background: rgba(6, 182, 212, 0.35); animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+            <div style="width: 36px; height: 36px; border-radius: 9999px; background: #0284c7; border: 3px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; transform: rotate(${angle}deg); transition: transform 0.35s ease;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff">
+                <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+              </svg>
+            </div>
+          </div>
+        `;
+
+        const icon = L.divIcon({
+          className: 'live-nav-vehicle-marker',
+          html: puckHtml,
+          iconSize: [48, 48],
+          iconAnchor: [24, 24],
+        });
+
+        if (liveVehicleMarkerRef.current) {
+          liveVehicleMarkerRef.current.setLatLng([curPos.lat, curPos.lng]);
+          liveVehicleMarkerRef.current.setIcon(icon);
+        } else {
+          liveVehicleMarkerRef.current = L.marker([curPos.lat, curPos.lng], {
+            icon,
+            zIndexOffset: 2000,
+          }).addTo(map);
+        }
+
+        // Accuracy circle around vehicle
+        if (liveAccuracyCircleRef.current) {
+          liveAccuracyCircleRef.current.setLatLng([curPos.lat, curPos.lng]);
+          liveAccuracyCircleRef.current.setRadius(accuracy);
+        } else {
+          liveAccuracyCircleRef.current = L.circle([curPos.lat, curPos.lng], {
+            radius: accuracy,
+            color: '#06b6d4',
+            weight: 1,
+            fillColor: '#06b6d4',
+            fillOpacity: 0.08,
+          }).addTo(map);
+        }
+
+        // Breadcrumbs history trail
+        breadcrumbsRef.current.push([curPos.lat, curPos.lng]);
+        if (breadcrumbsRef.current.length > 200) {
+          breadcrumbsRef.current.shift();
+        }
+
+        if (breadcrumbLineRef.current) {
+          breadcrumbLineRef.current.setLatLngs(breadcrumbsRef.current);
+        } else {
+          breadcrumbLineRef.current = L.polyline(breadcrumbsRef.current, {
+            color: '#10b981',
+            weight: 4,
+            opacity: 0.8,
+            dashArray: '4, 6',
+          }).addTo(map);
+        }
+
+        // Auto follow user
+        map.panTo([curPos.lat, curPos.lng], { animate: true, duration: 0.6 });
+        if (map.getZoom() < 15) {
+          map.setZoom(16, { animate: true });
+        }
+      },
+      (err) => {
+        console.warn('Live navigation GPS error:', err);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 15000,
+      }
+    );
+
+    watchIdRef.current = watchId;
+  }, [isLiveNavigating, destination, routeDetails, handleStopLiveNav]);
+
   // Route calculation & polyline drawing
   useEffect(() => {
     if (!routeLayerRef.current) return;
-    routeLayerRef.current.clearLayers();
 
     if (!origin || !destination) {
+      handleStopLiveNav();
+      routeLayerRef.current.clearLayers();
+      calculatedAlternativesRef.current = [];
       onRouteCalculated(null);
       onRouteError(null);
       onRouteLoadingChange(false);
@@ -359,95 +688,96 @@ export function LeafletMapView({
 
     const calcRoute = async () => {
       try {
-        // Try OSRM driving service first
-        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
-        
-        let coords: [number, number][] = [];
-        let distanceMeters = 0;
-        let durationSeconds = 0;
+        const osrmMode =
+          travelMode === 'WALKING'
+            ? 'foot'
+            : travelMode === 'BICYCLING'
+            ? 'bicycle'
+            : 'driving';
+        // Request OSRM with alternatives=3, overview=full and turn steps
+        const osrmUrl = `https://router.project-osrm.org/route/v1/${osrmMode}/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson&steps=true&alternatives=3`;
+
+        let parsedAlternatives: RouteAlternative[] = [];
 
         try {
           const res = await fetch(osrmUrl);
           if (res.ok) {
             const data = await res.json();
             if (data.routes && data.routes.length > 0) {
-              const r = data.routes[0];
-              coords = r.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]]);
-              distanceMeters = r.distance;
-              durationSeconds = r.duration;
+              parsedAlternatives = data.routes.map((r: any, idx: number) => {
+                const rCoords: [number, number][] = r.geometry.coordinates.map(
+                  (c: [number, number]) => [c[1], c[0]]
+                );
+                const rSteps =
+                  r.legs && r.legs[0]?.steps
+                    ? parseOsrmSteps(r.legs[0].steps, originLabel, destinationLabel)
+                    : [];
+                let rHighways =
+                  r.legs && r.legs[0]?.steps
+                    ? extractHighwaysFromSteps(r.legs[0].steps)
+                    : [];
+                if (rHighways.length === 0) {
+                  rHighways = inferOfflineHighways(origin, destination).highways;
+                }
+                const rSummary = buildHighwaySummary(rHighways);
+                const rDist = r.distance;
+                const rDur = r.duration;
+
+                return {
+                  id: `route-osrm-${idx}`,
+                  title:
+                    idx === 0
+                      ? `Mais Rápido (${rHighways[0] || 'Principal'})`
+                      : `Alternativa ${idx + 1} (${rHighways[0] || 'Secundária'})`,
+                  summary: rSummary,
+                  highways: rHighways,
+                  distanceMeters: rDist,
+                  durationMillis: rDur * 1000,
+                  distanceText: formatDistance(rDist),
+                  durationText: formatDuration(rDur),
+                  coordinates: rCoords,
+                  steps: rSteps,
+                };
+              });
             }
           }
         } catch {
-          // If OSRM is unreachable, fallback to direct geodesic line
+          // OSRM failed or offline; handled below
         }
 
-        // Direct geodesic fallback
-        if (coords.length === 0) {
-          coords = [
-            [origin.lat, origin.lng],
-            [destination.lat, destination.lng],
-          ];
-          distanceMeters = haversineDistance(origin, destination);
-          const speed = travelMode === 'WALKING' ? 1.3 : 12; // m/s
-          durationSeconds = distanceMeters / speed;
+        // Offline or remote area fallback
+        if (parsedAlternatives.length === 0) {
+          const baseDistance = haversineDistance(origin, destination);
+          const speeds: Record<TravelMode, number> = {
+            WALKING: 1.25, // ~4.5 km/h
+            BICYCLING: 4.2, // ~15 km/h
+            DRIVING: 16.7, // ~60 km/h
+            TRANSIT: 12.5, // ~45 km/h
+          };
+          const baseDuration = baseDistance / (speeds[travelMode] || 16.7);
+
+          parsedAlternatives = generateOfflineAlternatives(
+            origin,
+            originLabel,
+            destination,
+            destinationLabel,
+            travelMode,
+            baseDistance,
+            baseDuration
+          );
         }
 
         if (!isMounted) return;
 
-        // Draw Route Polyline with glow casing
-        if (routeLayerRef.current) {
-          const casing = L.polyline(coords, {
-            color: '#0f172a',
-            weight: 7,
-            opacity: 0.8,
-            lineCap: 'round',
-            lineJoin: 'round',
-          });
-          const line = L.polyline(coords, {
-            color: '#06b6d4',
-            weight: 4,
-            opacity: 0.95,
-            lineCap: 'round',
-            lineJoin: 'round',
-          });
+        calculatedAlternativesRef.current = parsedAlternatives;
 
-          routeLayerRef.current.addLayer(casing);
-          routeLayerRef.current.addLayer(line);
+        // Retain selected index if valid, else default to 0
+        const activeIdx =
+          selectedAltIndexRef.current < parsedAlternatives.length
+            ? selectedAltIndexRef.current
+            : 0;
 
-          // Fit route
-          mapInstanceRef.current?.fitBounds(line.getBounds(), {
-            padding: [70, 70],
-          });
-        }
-
-        const distStr =
-          distanceMeters < 1000
-            ? `${Math.round(distanceMeters)} m`
-            : `${(distanceMeters / 1000).toFixed(1).replace('.', ',')} km`;
-
-        const totalMinutes = Math.round(durationSeconds / 60);
-        let durStr = '';
-        if (totalMinutes < 60) {
-          durStr = `${totalMinutes} min`;
-        } else {
-          const h = Math.floor(totalMinutes / 60);
-          const m = totalMinutes % 60;
-          durStr = m > 0 ? `${h} h ${m} min` : `${h} h`;
-        }
-
-        onRouteCalculated({
-          distanceMeters,
-          durationMillis: durationSeconds * 1000,
-          distanceText: distStr,
-          durationText: durStr,
-          steps: [
-            {
-              instruction: `Rota de ${originLabel} para ${destination ? 'o destino selecionado' : 'ponto de chegada'}`,
-              distanceText: distStr,
-              durationText: durStr,
-            },
-          ],
-        });
+        handleSelectAlternative(activeIdx);
         onRouteLoadingChange(false);
       } catch (err: unknown) {
         if (!isMounted) return;
@@ -467,6 +797,9 @@ export function LeafletMapView({
     destination,
     travelMode,
     originLabel,
+    destinationLabel,
+    handleSelectAlternative,
+    handleStopLiveNav,
     onRouteCalculated,
     onRouteError,
     onRouteLoadingChange,
@@ -506,10 +839,40 @@ export function LeafletMapView({
     }
   }, []);
 
+  // Fit bounds specifically to the calculated route
+  const handleFitRouteBounds = useCallback(() => {
+    if (!mapInstanceRef.current || !routeLayerRef.current) return;
+    const layers = routeLayerRef.current.getLayers();
+    if (layers.length > 0) {
+      const group = L.featureGroup(layers);
+      mapInstanceRef.current.fitBounds(group.getBounds(), { padding: [60, 60] });
+    }
+  }, []);
+
   return (
     <div className="relative w-full h-full overflow-hidden select-none">
       {/* Leaflet Map DOM Container */}
       <div ref={mapContainerRef} className="w-full h-full z-0" />
+
+      {/* Active Route Floating Card with complete offline & turn-by-turn guidance */}
+      <ActiveRouteOverlay
+        routeDetails={routeDetails}
+        origin={origin}
+        originLabel={originLabel}
+        destination={destination}
+        destinationLabel={destinationLabel}
+        travelMode={travelMode}
+        isLiveNavigating={isLiveNavigating}
+        liveNavState={liveNavState}
+        onClearRoute={() => {
+          handleStopLiveNav();
+          onClearRoute();
+        }}
+        onFitRouteBounds={handleFitRouteBounds}
+        onToggleLiveNavigation={handleToggleLiveNavigation}
+        onRecenterOnUser={handleRecenterOnUser}
+        onSelectAlternative={handleSelectAlternative}
+      />
 
       {/* Picking on Map notification banner */}
       {isPickingOnMap && (

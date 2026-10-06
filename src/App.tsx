@@ -206,6 +206,25 @@ export default function App() {
     setIsPickingOnMap(false);
   };
 
+  // Select Route Alternative
+  const handleSelectAlternative = useCallback((idx: number) => {
+    setRouteDetails((prev) => {
+      if (!prev || !prev.alternatives || !prev.alternatives[idx]) return prev;
+      const alt = prev.alternatives[idx];
+      return {
+        ...prev,
+        distanceMeters: alt.distanceMeters,
+        durationMillis: alt.durationMillis,
+        distanceText: alt.distanceText,
+        durationText: alt.durationText,
+        summary: alt.summary,
+        highways: alt.highways,
+        steps: alt.steps,
+        selectedAlternativeIndex: idx,
+      };
+    });
+  }, []);
+
   // Load fixed dataset
   const handleLoadSample = (_sampleId?: string) => {
     const doc = getPioIxDataset();
@@ -318,6 +337,11 @@ export default function App() {
           onOpenPrintModal={() => setIsPrintModalOpen(true)}
           onOpenJsonModal={() => setIsJsonModalOpen(true)}
           onOpenOfflineModal={() => setIsOfflineModalOpen(true)}
+          onViewOnMap={() => {
+            setSidebarOpen(false);
+            setActiveTab('places');
+          }}
+          onSelectAlternative={handleSelectAlternative}
           uploadError={fileUploadError}
           onClearUploadError={() => setFileUploadError(null)}
           onCloseSidebar={() => setSidebarOpen(false)}
@@ -351,7 +375,9 @@ export default function App() {
             origin={origin}
             originLabel={originLabel}
             destination={destination}
+            destinationLabel={destinationLabel}
             travelMode={travelMode}
+            routeDetails={routeDetails}
             isPickingOnMap={isPickingOnMap}
             kmlDoc={kmlDoc}
             onSelectPlacemark={handleSelectPlacemark}
@@ -361,10 +387,12 @@ export default function App() {
             onRouteCalculated={setRouteDetails}
             onRouteError={setRouteError}
             onRouteLoadingChange={setRouteLoading}
+            onClearRoute={handleClearRoute}
             onMapClickPoint={handleMapClickPoint}
             onDragDeparture={handleDragDeparture}
             onOpenPrintModal={() => setIsPrintModalOpen(true)}
             onOpenOfflineModal={() => setIsOfflineModalOpen(true)}
+            onSelectAlternative={handleSelectAlternative}
           />
         </main>
       </div>

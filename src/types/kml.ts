@@ -60,14 +60,51 @@ export interface RouteDestination {
   placemarkId?: string;
 }
 
+export interface RouteStep {
+  instruction: string;
+  distanceText?: string;
+  durationText?: string;
+  highway?: string;
+  modifier?: string;
+  type?: string;
+  distanceMeters?: number;
+  durationSeconds?: number;
+  maneuverLocation?: LatLng;
+}
+
+export interface RouteAlternative {
+  id: string;
+  title: string;
+  summary: string;
+  highways: string[];
+  distanceMeters: number;
+  durationMillis: number;
+  distanceText: string;
+  durationText: string;
+  coordinates: [number, number][];
+  steps: RouteStep[];
+}
+
 export interface RouteResultDetails {
   distanceMeters: number;
   durationMillis: number;
   distanceText: string;
   durationText: string;
-  steps: Array<{
-    instruction: string;
-    distanceText?: string;
-    durationText?: string;
-  }>;
+  summary?: string;
+  highways?: string[];
+  steps: RouteStep[];
+  alternatives?: RouteAlternative[];
+  selectedAlternativeIndex?: number;
+}
+
+export interface LiveNavigationState {
+  isActive: boolean;
+  currentLocation: LatLng | null;
+  heading: number | null;
+  speedKmh: number | null;
+  altitude: number | null;
+  accuracy: number | null;
+  remainingDistanceMeters: number | null;
+  remainingDurationSeconds: number | null;
+  nextStep: RouteStep | null;
 }

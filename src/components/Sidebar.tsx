@@ -44,6 +44,8 @@ interface SidebarProps {
   onOpenPrintModal: () => void;
   onOpenJsonModal: () => void;
   onOpenOfflineModal?: () => void;
+  onViewOnMap?: () => void;
+  onSelectAlternative?: (index: number) => void;
   uploadError?: string | null;
   onClearUploadError?: () => void;
 }
@@ -86,6 +88,8 @@ export function Sidebar({
   onOpenPrintModal,
   onOpenJsonModal,
   onOpenOfflineModal,
+  onViewOnMap,
+  onSelectAlternative,
   uploadError,
   onClearUploadError,
 }: SidebarProps) {
@@ -221,6 +225,8 @@ export function Sidebar({
               onSelectPlacemarkAsDestination={onSetAsDestination}
               onSwapPoints={onSwapPoints}
               onClearRoute={onClearRoute}
+              onViewOnMap={onViewOnMap}
+              onSelectAlternative={onSelectAlternative}
             />
           )}
 

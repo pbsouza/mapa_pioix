@@ -38,6 +38,8 @@ interface RoutePanelProps {
   onSelectPlacemarkAsDestination: (pm: PlacemarkFeature) => void;
   onSwapPoints: () => void;
   onClearRoute: () => void;
+  onViewOnMap?: () => void;
+  onSelectAlternative?: (index: number) => void;
 }
 
 export function RoutePanel({
@@ -59,6 +61,8 @@ export function RoutePanel({
   onSelectPlacemarkAsDestination,
   onSwapPoints,
   onClearRoute,
+  onViewOnMap,
+  onSelectAlternative,
 }: RoutePanelProps) {
   const [showSteps, setShowSteps] = useState(false);
 
@@ -84,7 +88,7 @@ export function RoutePanel({
           </div>
           <div>
             <h3 className="font-semibold text-slate-900 text-xs sm:text-sm">Traçar Rotas & Navegação</h3>
-            <p className="text-[10px] sm:text-[11px] text-slate-500">Google Maps Routes API integrada</p>
+            <p className="text-[10px] sm:text-[11px] text-slate-500">Navegação integrada e offline</p>
           </div>
         </div>
 
@@ -270,7 +274,7 @@ export function RoutePanel({
       {routeLoading && (
         <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-lg flex items-center justify-center gap-2 text-xs text-blue-700">
           <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
-          <span>Calculando melhor trajeto no Google Maps...</span>
+          <span>Calculando melhores trajetos e rodovias...</span>
         </div>
       )}
 
@@ -299,7 +303,7 @@ export function RoutePanel({
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-white p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
               <span className="text-[10px] text-slate-500 block">Distância Total</span>
-              <span className="text-base sm:text-lg font-bold text-slate-900">
+              <span className="text-base sm:text-lg font-bold text-slate-900 font-mono">
                 {routeDetails.distanceText}
               </span>
             </div>
@@ -311,16 +315,85 @@ export function RoutePanel({
             </div>
           </div>
 
-          {/* Action: Open in Google Maps */}
+          {/* Highways Display */}
+          {routeDetails.highways && routeDetails.highways.length > 0 && (
+            <div className="bg-white p-2.5 rounded-lg border border-slate-200/80 space-y-1">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-slate-500 font-semibold uppercase tracking-wider">
+                  Rodovias a Seguir:
+                </span>
+                <span className="text-slate-400 font-medium">
+                  {routeDetails.summary}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                {routeDetails.highways.map((hw, idx) => (
+                  <span
+                    key={idx}
+                    className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-300 font-mono font-bold text-[10px] shadow-2xs"
+                  >
+                    {hw}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Alternatives Switcher */}
+          {routeDetails.alternatives && routeDetails.alternatives.length > 1 && (
+            <div className="bg-white p-2.5 rounded-lg border border-slate-200/80 space-y-1">
+              <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block">
+                Melhores Trajetos / Alternativas:
+              </span>
+              <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                {routeDetails.alternatives.map((alt, idx) => {
+                  const isSelected = (routeDetails.selectedAlternativeIndex ?? 0) === idx;
+                  return (
+                    <button
+                      type="button"
+                      key={alt.id}
+                      onClick={() => onSelectAlternative && onSelectAlternative(idx)}
+                      className={`p-2 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-50 border-blue-400 text-blue-900 font-bold shadow-2xs ring-1 ring-blue-300'
+                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
+                      }`}
+                    >
+                      <div className="text-[11px] truncate flex items-center justify-between">
+                        <span className="truncate">{alt.title}</span>
+                        {isSelected && <span className="text-[10px] text-blue-600 font-bold ml-1">✓</span>}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5 font-mono">
+                        {alt.distanceText} • {alt.durationText}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Primary Action: View on Map inside the app */}
+          {onViewOnMap && (
+            <button
+              onClick={onViewOnMap}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer min-h-[44px]"
+            >
+              <Navigation className="w-4 h-4 shrink-0 rotate-45" />
+              <span>Ver Rota no Mapa</span>
+            </button>
+          )}
+
+          {/* Secondary Action: External Google Maps link */}
           {canNavigateExternal && (
             <a
               href={externalMapsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-xs shadow-sm transition-colors cursor-pointer min-h-[44px]"
+              className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition-colors border border-slate-200"
             >
-              <ExternalLink className="w-4 h-4 shrink-0" />
-              <span>Iniciar Navegação no Google Maps</span>
+              <ExternalLink className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <span>Abrir no Google Maps externo (requer internet)</span>
             </a>
           )}
 
