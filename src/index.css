@@ -1,5 +1,29 @@
 @import "tailwindcss";
 
+/* Google Maps Route Dashed Trajectory & Flow Animations */
+@keyframes googleMapsDashPulse {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -44;
+  }
+}
+
+.gmaps-trajectory-dash {
+  stroke-dasharray: 8, 14 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  animation: googleMapsDashPulse 1.6s linear infinite !important;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.8));
+}
+
+.gmaps-lead-dash {
+  stroke-dasharray: 6, 8 !important;
+  stroke-linecap: round !important;
+  animation: googleMapsDashPulse 1.2s linear infinite !important;
+}
+
 @media print {
   /* Force exact colors in printed PDF */
   html, body {

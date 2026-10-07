@@ -377,10 +377,16 @@ export function RoutePanel({
           {onViewOnMap && (
             <button
               onClick={onViewOnMap}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer min-h-[44px]"
+              className="w-full flex flex-col items-center justify-center gap-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-xs shadow-md hover:shadow-lg transition-all cursor-pointer min-h-[48px] group"
+              title="Ir direto para o mapa e visualizar a rota traçada com linha tracejada"
             >
-              <Navigation className="w-4 h-4 shrink-0 rotate-45" />
-              <span>Ver Rota no Mapa</span>
+              <div className="flex items-center gap-2">
+                <Navigation className="w-4 h-4 shrink-0 rotate-45 group-hover:scale-110 transition-transform text-cyan-200" />
+                <span className="text-sm font-extrabold tracking-wide">Visualizar Rota no Mapa</span>
+              </div>
+              <span className="text-[10px] text-blue-100 font-normal">
+                Vai direto para o mapa • Mantém a navegação ativa
+              </span>
             </button>
           )}
 

@@ -135,9 +135,14 @@ export function LeafletMapView({
   const breadcrumbLineRef = useRef<L.Polyline | null>(null);
   const breadcrumbsRef = useRef<[number, number][]>([]);
 
-  // Cached alternatives
+  // Track navigation state in ref to avoid stale closures and unwanted zoom resets
+  const isLiveNavigatingRef = useRef(isLiveNavigating);
+  isLiveNavigatingRef.current = isLiveNavigating;
+
+  // Cached alternatives & last calculation key to prevent re-fetching and resets
   const calculatedAlternativesRef = useRef<RouteAlternative[]>([]);
   const selectedAltIndexRef = useRef<number>(0);
+  const lastCalcRouteKeyRef = useRef<string>('');
 
   const [mapType, setMapType] = useState<'streets' | 'topo' | 'satellite'>('streets');
   const tileLayerRef = useRef<L.TileLayer | null>(null);
@@ -177,11 +182,21 @@ export function LeafletMapView({
     });
   }, []);
 
+  const handleStopLiveNavRef = useRef(handleStopLiveNav);
+  useEffect(() => {
+    handleStopLiveNavRef.current = handleStopLiveNav;
+  }, [handleStopLiveNav]);
+
+  const onMapClickPointRef = useRef(onMapClickPoint);
+  useEffect(() => {
+    onMapClickPointRef.current = onMapClickPoint;
+  }, [onMapClickPoint]);
+
   // SVG fallback tile displayed when user is offline and tile was not pre-cached
   const errorTileFallback =
     'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="%230f172a" stroke="%231e293b" stroke-width="1"/><path d="M60 128h136M128 60v136" stroke="%231e293b" stroke-width="0.5"/><text x="128" y="125" fill="%2364748b" font-family="sans-serif" font-size="11" font-weight="bold" text-anchor="middle">Modo Offline</text><text x="128" y="142" fill="%23475569" font-family="sans-serif" font-size="9" text-anchor="middle">Conecte para baixar</text></svg>';
 
-  // Initialize Map
+  // Initialize Map ONCE on mount without tearing it down on state changes
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
@@ -191,6 +206,10 @@ export function LeafletMapView({
       zoomControl: false,
       attributionControl: false,
     });
+
+    // Create high-visibility route pane so the blue highway line is always clearly on top
+    const routePane = map.createPane('routePane');
+    routePane.style.zIndex = '520';
 
     // Custom dark / modern tile layer with offline fallback
     const standardLayer = L.tileLayer(
@@ -209,19 +228,19 @@ export function LeafletMapView({
     markersLayerRef.current = L.layerGroup().addTo(map);
     routeLayerRef.current = L.layerGroup().addTo(map);
 
-    // Map click handler
+    // Map click handler (uses stable ref so map is never recreated)
     map.on('click', (e: L.LeafletMouseEvent) => {
-      onMapClickPoint({ lat: e.latlng.lat, lng: e.latlng.lng });
+      onMapClickPointRef.current?.({ lat: e.latlng.lat, lng: e.latlng.lng });
     });
 
     mapInstanceRef.current = map;
 
     return () => {
-      handleStopLiveNav();
+      handleStopLiveNavRef.current?.();
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, [onMapClickPoint, handleStopLiveNav]);
+  }, []);
 
   // Handle Map Type Switching
   useEffect(() => {
@@ -454,42 +473,72 @@ export function LeafletMapView({
         // 1. Draw inactive alternatives as clickable muted dashed lines
         alternatives.forEach((alt, idx) => {
           if (idx !== index) {
+            const altCasing = L.polyline(alt.coordinates, {
+              color: '#1e293b',
+              weight: 6,
+              opacity: 0.5,
+              pane: 'routePane',
+            });
             const altLine = L.polyline(alt.coordinates, {
               color: '#64748b',
-              weight: 5,
-              opacity: 0.65,
+              weight: 4,
+              opacity: 0.75,
               dashArray: '8, 8',
               lineCap: 'round',
+              pane: 'routePane',
             });
             altLine.on('click', () => {
               handleSelectAlternative(idx);
             });
+            routeLayerRef.current?.addLayer(altCasing);
             routeLayerRef.current?.addLayer(altLine);
           }
         });
 
-        // 2. Draw active selected route with glowing black casing + cyan path
+        // 2. High-contrast navy casing for road separation
         const casing = L.polyline(selectedAlt.coordinates, {
-          color: '#0f172a',
-          weight: 8,
-          opacity: 0.9,
-          lineCap: 'round',
-          lineJoin: 'round',
-        });
-        const line = L.polyline(selectedAlt.coordinates, {
-          color: '#06b6d4',
-          weight: 5,
+          color: '#1e3a8a', // Deep Navy Blue casing
+          weight: 10,
           opacity: 0.95,
           lineCap: 'round',
           lineJoin: 'round',
+          pane: 'routePane',
+        });
+
+        // 3. Vibrant Royal Blue route line (standard Google Maps navigation blue)
+        const line = L.polyline(selectedAlt.coordinates, {
+          color: '#2563eb', // Royal Blue (#2563eb)
+          weight: 7,
+          opacity: 0.98,
+          lineCap: 'round',
+          lineJoin: 'round',
+          pane: 'routePane',
+        });
+
+        // 4. GOOGLE MAPS DASHED TRAJECTORY LINE (Linha tracejada de navegação)
+        // Linha branca nítida no centro da pista azul indicando a trajetória a seguir
+        const trajectoryDashedLine = L.polyline(selectedAlt.coordinates, {
+          color: '#ffffff', // Branco nítido exatamente como o traçado do Google Maps
+          weight: 3.5,
+          opacity: 1.0,
+          dashArray: '8, 14',
+          lineCap: 'round',
+          lineJoin: 'round',
+          className: 'gmaps-trajectory-dash',
+          pane: 'routePane',
         });
 
         routeLayerRef.current.addLayer(casing);
         routeLayerRef.current.addLayer(line);
+        routeLayerRef.current.addLayer(trajectoryDashedLine);
+        // Garante que a linha tracejada fique sobreposta à linha azul, visível no topo
+        trajectoryDashedLine.bringToFront();
 
-        mapInstanceRef.current?.fitBounds(line.getBounds(), {
-          padding: [70, 70],
-        });
+        if (!isLiveNavigatingRef.current) {
+          mapInstanceRef.current?.fitBounds(line.getBounds(), {
+            padding: [70, 70],
+          });
+        }
       }
 
       onRouteCalculated({
@@ -510,6 +559,11 @@ export function LeafletMapView({
     },
     [onRouteCalculated, onSelectAlternativeProp]
   );
+
+  const handleSelectAlternativeRef = useRef(handleSelectAlternative);
+  useEffect(() => {
+    handleSelectAlternativeRef.current = handleSelectAlternative;
+  }, [handleSelectAlternative]);
 
   // Toggle Real-Time Live Navigation with continuous geolocation tracking
   const handleToggleLiveNavigation = useCallback(() => {
@@ -592,8 +646,8 @@ export function LeafletMapView({
         const angle = heading ?? 0;
         const puckHtml = `
           <div style="position: relative; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
-            <div style="position: absolute; inset: 0; border-radius: 9999px; background: rgba(6, 182, 212, 0.35); animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-            <div style="width: 36px; height: 36px; border-radius: 9999px; background: #0284c7; border: 3px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; transform: rotate(${angle}deg); transition: transform 0.35s ease;">
+            <div style="position: absolute; inset: 0; border-radius: 9999px; background: rgba(37, 99, 235, 0.4); animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+            <div style="width: 36px; height: 36px; border-radius: 9999px; background: #2563eb; border: 3px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; transform: rotate(${angle}deg); transition: transform 0.35s ease;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff">
                 <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
               </svg>
@@ -625,10 +679,10 @@ export function LeafletMapView({
         } else {
           liveAccuracyCircleRef.current = L.circle([curPos.lat, curPos.lng], {
             radius: accuracy,
-            color: '#06b6d4',
-            weight: 1,
-            fillColor: '#06b6d4',
-            fillOpacity: 0.08,
+            color: '#2563eb',
+            weight: 1.5,
+            fillColor: '#3b82f6',
+            fillOpacity: 0.1,
           }).addTo(map);
         }
 
@@ -642,7 +696,7 @@ export function LeafletMapView({
           breadcrumbLineRef.current.setLatLngs(breadcrumbsRef.current);
         } else {
           breadcrumbLineRef.current = L.polyline(breadcrumbsRef.current, {
-            color: '#10b981',
+            color: '#2563eb',
             weight: 4,
             opacity: 0.8,
             dashArray: '4, 6',
@@ -673,6 +727,7 @@ export function LeafletMapView({
     if (!routeLayerRef.current) return;
 
     if (!origin || !destination) {
+      lastCalcRouteKeyRef.current = '';
       handleStopLiveNav();
       routeLayerRef.current.clearLayers();
       calculatedAlternativesRef.current = [];
@@ -681,6 +736,13 @@ export function LeafletMapView({
       onRouteLoadingChange(false);
       return;
     }
+
+    const routeParamsKey = `${origin.lat.toFixed(6)},${origin.lng.toFixed(6)}->${destination.lat.toFixed(6)},${destination.lng.toFixed(6)}@${travelMode}`;
+    if (lastCalcRouteKeyRef.current === routeParamsKey && calculatedAlternativesRef.current.length > 0) {
+      // Exactly same route points, avoid re-fetching or interrupting active navigation!
+      return;
+    }
+    lastCalcRouteKeyRef.current = routeParamsKey;
 
     let isMounted = true;
     onRouteLoadingChange(true);
@@ -777,7 +839,7 @@ export function LeafletMapView({
             ? selectedAltIndexRef.current
             : 0;
 
-        handleSelectAlternative(activeIdx);
+        handleSelectAlternativeRef.current(activeIdx);
         onRouteLoadingChange(false);
       } catch (err: unknown) {
         if (!isMounted) return;
@@ -798,8 +860,6 @@ export function LeafletMapView({
     travelMode,
     originLabel,
     destinationLabel,
-    handleSelectAlternative,
-    handleStopLiveNav,
     onRouteCalculated,
     onRouteError,
     onRouteLoadingChange,

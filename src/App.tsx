@@ -99,28 +99,28 @@ export default function App() {
   };
 
   // Placemark Selection
-  const handleSelectPlacemark = (pm: PlacemarkFeature) => {
+  const handleSelectPlacemark = useCallback((pm: PlacemarkFeature) => {
     setSelectedPlacemark(pm);
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setSidebarOpen(false);
     }
-  };
+  }, []);
 
-  const handleCloseInfoWindow = () => {
+  const handleCloseInfoWindow = useCallback(() => {
     setSelectedPlacemark(null);
-  };
+  }, []);
 
   // Set Placemark as Destination
-  const handleSetAsDestination = (pm: PlacemarkFeature) => {
+  const handleSetAsDestination = useCallback((pm: PlacemarkFeature) => {
     if (!pm.point) return;
     setDestination(pm.point);
     setDestinationLabel(pm.name);
     setActiveTab('routes');
     setSidebarOpen(true);
-  };
+  }, []);
 
   // Set Placemark as Origin
-  const handleSetAsOrigin = (pm: PlacemarkFeature) => {
+  const handleSetAsOrigin = useCallback((pm: PlacemarkFeature) => {
     if (!pm.point) return;
     setOrigin(pm.point);
     setOriginLabel(pm.name);
@@ -128,10 +128,10 @@ export default function App() {
     setIsPickingOnMap(false);
     setActiveTab('routes');
     setSidebarOpen(true);
-  };
+  }, []);
 
   // Geolocation request
-  const handleRequestGpsLocation = () => {
+  const handleRequestGpsLocation = useCallback(() => {
     if (!('geolocation' in navigator)) {
       setRouteError('Geolocalização não é suportada pelo seu navegador.');
       return;
@@ -159,43 +159,41 @@ export default function App() {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  };
+  }, []);
 
   // Map click picking
-  const handleTogglePickOnMap = () => {
+  const handleTogglePickOnMap = useCallback(() => {
     setIsPickingOnMap((prev) => !prev);
-  };
+  }, []);
 
-  const handleMapClickPoint = (pt: LatLng) => {
+  const handleMapClickPoint = useCallback((pt: LatLng) => {
     setOrigin(pt);
     setOriginLabel(`Ponto marcado (${pt.lat.toFixed(4)}, ${pt.lng.toFixed(4)})`);
     setOriginType('map_click');
     setIsPickingOnMap(false);
     setActiveTab('routes');
-  };
+  }, []);
 
-  const handleDragDeparture = (pt: LatLng) => {
+  const handleDragDeparture = useCallback((pt: LatLng) => {
     setOrigin(pt);
     setOriginLabel(`Ponto de partida (${pt.lat.toFixed(4)}, ${pt.lng.toFixed(4)})`);
-  };
+  }, []);
 
   // Swap Points
-  const handleSwapPoints = () => {
-    const prevOrigin = origin;
-    const prevOriginLabel = originLabel;
-    const prevDest = destination;
-    const prevDestLabel = destinationLabel;
-
-    setOrigin(prevDest);
-    setOriginLabel(prevDestLabel);
-    setOriginType(prevDest ? 'placemark' : null);
-
-    setDestination(prevOrigin);
-    setDestinationLabel(prevOriginLabel);
-  };
+  const handleSwapPoints = useCallback(() => {
+    setOrigin((prevOrigin) => {
+      setDestination(prevOrigin);
+      return destination;
+    });
+    setOriginLabel((prevOriginLabel) => {
+      setDestinationLabel(prevOriginLabel);
+      return destinationLabel;
+    });
+    setOriginType(destination ? 'placemark' : null);
+  }, [destination, destinationLabel]);
 
   // Clear Route
-  const handleClearRoute = () => {
+  const handleClearRoute = useCallback(() => {
     setOrigin(null);
     setOriginLabel('Ponto de Partida');
     setOriginType(null);
@@ -204,7 +202,30 @@ export default function App() {
     setRouteDetails(null);
     setRouteError(null);
     setIsPickingOnMap(false);
-  };
+  }, []);
+
+  // Direct view on map: Closes sidebar, leaves routes tab active and continues live navigation
+  const handleViewOnMap = useCallback(() => {
+    setSidebarOpen(false);
+    setActiveTab('routes');
+  }, []);
+
+  // Open Route tab / Go directly to map if route already exists
+  const handleOpenRouteTab = useCallback(() => {
+    if (routeDetails) {
+      if (sidebarOpen) {
+        // Go straight to the map!
+        setSidebarOpen(false);
+      } else {
+        // Open route details panel
+        setActiveTab('routes');
+        setSidebarOpen(true);
+      }
+    } else {
+      setActiveTab('routes');
+      setSidebarOpen(true);
+    }
+  }, [routeDetails, sidebarOpen]);
 
   // Select Route Alternative
   const handleSelectAlternative = useCallback((idx: number) => {
@@ -287,10 +308,7 @@ export default function App() {
           setSidebarOpen(true);
         }}
         onRequestGps={handleRequestGpsLocation}
-        onOpenRouteTab={() => {
-          setActiveTab('routes');
-          setSidebarOpen(true);
-        }}
+        onOpenRouteTab={handleOpenRouteTab}
         onOpenPrintModal={() => setIsPrintModalOpen(true)}
         onOpenJsonModal={() => setIsJsonModalOpen(true)}
         onOpenMobileGuide={() => setIsMobileGuideOpen(true)}
@@ -337,10 +355,7 @@ export default function App() {
           onOpenPrintModal={() => setIsPrintModalOpen(true)}
           onOpenJsonModal={() => setIsJsonModalOpen(true)}
           onOpenOfflineModal={() => setIsOfflineModalOpen(true)}
-          onViewOnMap={() => {
-            setSidebarOpen(false);
-            setActiveTab('places');
-          }}
+          onViewOnMap={handleViewOnMap}
           onSelectAlternative={handleSelectAlternative}
           uploadError={fileUploadError}
           onClearUploadError={() => setFileUploadError(null)}
@@ -426,8 +441,13 @@ export default function App() {
 
         <button
           onClick={() => {
-            if (sidebarOpen && activeTab === 'routes') {
+            if (sidebarOpen) {
+              // Vai direto para o mapa sem fechar ou interromper navegação
               setSidebarOpen(false);
+            } else if (routeDetails) {
+              // Já possui rota traçada e mapa visível: permite abrir detalhes
+              setActiveTab('routes');
+              setSidebarOpen(true);
             } else {
               setActiveTab('routes');
               setSidebarOpen(true);

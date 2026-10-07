@@ -123,13 +123,19 @@ export function Header({
           onClick={onOpenRouteTab}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer border ${
             hasActiveRoute
-              ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-400 shadow-sm animate-pulse'
+              ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-400 shadow-sm'
               : 'bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border-slate-700'
           }`}
-          title="Abrir painel de rotas"
+          title={hasActiveRoute ? (sidebarOpen ? 'Ir direto para o mapa' : 'Abrir painel de rotas') : 'Abrir painel de rotas'}
         >
           <Route className="w-3.5 h-3.5 text-cyan-300" />
-          <span>Traçar Rota</span>
+          <span>
+            {hasActiveRoute
+              ? sidebarOpen
+                ? 'Ver no Mapa'
+                : 'Painel de Rota'
+              : 'Traçar Rota'}
+          </span>
         </button>
 
         <button
@@ -200,11 +206,11 @@ export function Header({
           onClick={onOpenRouteTab}
           className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors border shrink-0 ${
             hasActiveRoute
-              ? 'bg-blue-600 text-white border-blue-400 animate-pulse'
+              ? 'bg-blue-600 text-white border-blue-400'
               : 'bg-slate-800 active:bg-slate-700 text-cyan-300 border-slate-700'
           }`}
-          title="Traçar Rotas"
-          aria-label="Traçar Rotas"
+          title={hasActiveRoute ? (sidebarOpen ? 'Ir direto para o mapa' : 'Abrir painel de rotas') : 'Traçar Rotas'}
+          aria-label={hasActiveRoute ? 'Ver Rota no Mapa' : 'Traçar Rotas'}
         >
           <Route className="w-4 h-4" />
         </button>
